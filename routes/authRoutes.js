@@ -2,11 +2,10 @@
 const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
+const { authenticateToken } = require('../middleware/authMiddleware');
 
-// Initiate GitHub OAuth flow
 router.get('/github', authController.githubAuth);
-
-// GitHub OAuth callback
 router.get('/github/callback', authController.githubCallback);
+router.get('/user', authenticateToken, authController.getUser);
 
 module.exports = router;

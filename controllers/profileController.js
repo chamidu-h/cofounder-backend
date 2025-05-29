@@ -123,3 +123,47 @@ console.error('Delete profile error:', err);
 res.status(500).json({ error: 'Failed to delete profile' });
 }
 };
+
+exports.getUserPublicProfile = async (req, res) => {
+    try {
+        const userIdToView = parseInt(req.params.userId, 10); // Get user ID from URL parameter
+        if (isNaN(userIdToView)) {
+            return res.status(400).json({ error: 'Invalid user ID format.' });
+        }
+
+        // Fetch the user's basic info (username, avatar)
+        const userBasicInfo = await databaseService.getUserById(userIdToView);
+        if (!userBasicInfo) {
+            return res.status(404).json({ error: 'User not found.' });
+        }
+
+        // Fetch the user's saved profile data
+        const userProfileRow = await databaseService.getUserProfile(userIdToView); // This gets the {id, user_id, profile_data} row
+        
+        if (!userProfileRow || !userProfileRow.profile_data) {
+            // If the user exists but hasn't saved a profile, you might return basic info or a specific message
+            return res.status(404).json({ 
+                error: 'This user has not created a co-founder profile yet.',
+                user: { // Send basic info
+                    github_username: userBasicInfo.github_username,
+                    github_avatar_url: userBasicInfo.github_avatar_url
+                }
+            });
+        }
+
+        // Return the profile_data part, similar to getSavedProfile, but also include basic user info
+        res.json({
+            user: { // Basic info about the profile owner
+                user_id: userBasicInfo.id,
+                github_username: userBasicInfo.github_username,
+                github_avatar_url: userBasicInfo.github_avatar_url,
+                github_profile_url: userBasicInfo.github_profile_url
+            },
+            profile: userProfileRow.profile_data // The actual co-founder profile content
+        });
+
+    } catch (err) {
+        console.error('Get user public profile error:', err);
+        res.status(500).json({ error: 'Failed to get user profile' });
+    }
+};

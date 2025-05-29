@@ -12,6 +12,8 @@ router.post('/save', authenticateToken, profileController.saveProfile);
 router.get('/saved', authenticateToken, profileController.getSavedProfile); 
 router.delete('/saved', authenticateToken, profileController.deleteProfile); 
 
+
+
 // New Suggestion Routes
 router.get('/suggestions', authenticateToken, suggestionController.getSuggestions);
 
@@ -24,5 +26,9 @@ router.get('/connections/sent', authenticateToken, connectionController.getSentR
 router.post('/connections/accept', authenticateToken, connectionController.acceptRequest); 
 router.delete('/connections/:connectionId/decline', authenticateToken, connectionController.declineOrCancelRequest);
 router.get('/connections/active', authenticateToken, connectionController.getActiveConnections);
+
+// New route to get a specific user's public profile
+// The :userId here will be the ID of the user whose profile is being viewed
+router.get('/:userId', authenticateToken, profileController.getUserPublicProfile); // GET /api/profile/:userId
 
 module.exports = router;

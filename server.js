@@ -69,10 +69,13 @@ try {
   const authRoutes = require('./routes/authRoutes');
   const profileRoutes = require('./routes/profileRoutes');
   const jobRoutes = require('./routes/jobRoutes'); // Make sure this file exists
+  const cvRoutes = require('./routes/cvRoutes');
 
   app.use('/api/auth', authRoutes);
   app.use('/api/profile', profileRoutes);
   app.use('/api/jobs', jobRoutes); // Mount the new job routes
+  app.use('/api/cv', cvRoutes);
+  
   console.log("[INFO] API routes mounted: /api/auth, /api/profile, /api/jobs");
 } catch (routeError) {
   console.error("[FATAL] Error loading routes. Application will not start correctly.", routeError);

@@ -232,6 +232,33 @@ const schemasAndSetup = [
       client.release();
     }
   }
+
+  /**
+ * Saves or updates a user's parsed CV text in the database.
+ * Uses ON CONFLICT to handle both INSERT and UPDATE seamlessly.
+ */
+async saveUserCv(userId, cvText, originalFilename) {
+    const sql = `
+        INSERT INTO user_cvs (user_id, cv_text, original_filename)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (user_id) DO UPDATE SET
+            cv_text = EXCLUDED.cv_text,
+            original_filename = EXCLUDED.original_filename,
+            updated_at = NOW()
+        RETURNING *;
+    `;
+    const result = await this.query(sql, [userId, cvText, originalFilename]);
+    return result.rows[0];
+}
+
+/**
+ * Retrieves a user's parsed CV text from the database.
+ */
+async getUserCv(userId) {
+    const sql = `SELECT * FROM user_cvs WHERE user_id = $1;`;
+    const result = await this.query(sql, [userId]);
+    return result.rows[0]; // Returns the full CV row or undefined
+}
 }
 
 const databaseServiceInstance = new DatabaseService();

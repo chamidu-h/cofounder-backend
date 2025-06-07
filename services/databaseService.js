@@ -46,6 +46,15 @@ class DatabaseService {
       `CREATE TABLE IF NOT EXISTS connections (id SERIAL PRIMARY KEY, requester_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, addressee_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, status VARCHAR(20) NOT NULL DEFAULT 'pending', created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP, CONSTRAINT uq_connection_pair UNIQUE (requester_id, addressee_id), CONSTRAINT chk_no_self_connect CHECK (requester_id <> addressee_id));`,
       `CREATE TABLE IF NOT EXISTS jobs (id SERIAL PRIMARY KEY, job_title TEXT NOT NULL, company_name TEXT, job_url TEXT UNIQUE NOT NULL, description_html TEXT, searchable_text tsvector, created_at TIMESTAMPTZ DEFAULT NOW());`,
       `CREATE OR REPLACE FUNCTION update_updated_at_column() RETURNS TRIGGER AS $$ BEGIN NEW.updated_at = NOW(); RETURN NEW; END; $$ language 'plpgsql';`,
+      // --- NEW: User CVs Schema ---
+`CREATE TABLE IF NOT EXISTS user_cvs (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+    cv_text TEXT NOT NULL,
+    original_filename TEXT,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);`,
       `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_users_updated_at') THEN CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); END IF; END $$;`,
       `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_profile_generations_updated_at') THEN CREATE TRIGGER update_profile_generations_updated_at BEFORE UPDATE ON profile_generations FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); END IF; END $$;`,
       `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_saved_profiles_updated_at') THEN CREATE TRIGGER update_saved_profiles_updated_at BEFORE UPDATE ON saved_profiles FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); END IF; END $$;`,
@@ -54,6 +63,12 @@ class DatabaseService {
       `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_class c WHERE c.relname = 'idx_connections_addressee_id') THEN CREATE INDEX idx_connections_addressee_id ON connections(addressee_id); END IF; END $$;`,
       `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_class c WHERE c.relname = 'idx_connections_status') THEN CREATE INDEX idx_connections_status ON connections(status); END IF; END $$;`,
       `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_class c WHERE c.relname = 'jobs_search_idx') THEN CREATE INDEX jobs_search_idx ON jobs USING GIN (searchable_text); END IF; END $$;`
+    // --- NEW: Trigger for user_cvs ---
+`DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_user_cvs_updated_at') THEN
+    CREATE TRIGGER update_user_cvs_updated_at BEFORE UPDATE ON user_cvs FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+  END IF;
+END $$;`
     ];
     try {
       for (const statement of schemasAndSetup) await this.pool.query(statement);

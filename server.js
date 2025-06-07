@@ -67,9 +67,11 @@ if (!fs.existsSync(dbDir)) {
 try {
   const authRoutes = require('./routes/authRoutes');
   const profileRoutes = require('./routes/profileRoutes');
+  const jobRoutes = require('./routes/jobRoutes');
 
   app.use('/api/auth', authRoutes);
   app.use('/api/profile', profileRoutes);
+  app.use('/api/jobs', jobRoutes);
   console.log("[INFO] API routes mounted: /api/auth, /api/profile");
 } catch (routeError) {
   console.error("[FATAL] Error loading routes. Application might not work correctly:", routeError);

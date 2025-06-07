@@ -1,12 +1,19 @@
 // routes/jobRoutes.js
 const express = require('express');
 const router = express.Router();
-const jobController = require('../controllers/jobController');
 
-// Route to get all job listings
-router.get('/', jobController.getAllJobs);
+// REMOVED: const jobController = require('../controllers/jobController');
 
-// A route to trigger the import. Secure this in a real app!
-router.post('/import', jobController.importJobs);
+// The entire module is now a factory function that accepts its dependencies.
+module.exports = (jobController, authMiddleware) => {
 
-module.exports = router;
+    // Route to get all job listings (publicly accessible, no auth middleware)
+    router.get('/', jobController.getAllJobs);
+
+    // Route to trigger the data import.
+    // This is now protected and can only be accessed by an authenticated user.
+    router.post('/import', authMiddleware.authenticateToken, jobController.importJobs);
+
+    // Return the configured router to be used by server.js
+    return router;
+};

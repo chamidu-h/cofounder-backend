@@ -1,27 +1,39 @@
 // controllers/jobController.js
-const db = require('../services/databaseService');
+
 const path = require('path');
 
-exports.getAllJobs = async (req, res) => {
-    try {
-        const jobs = await db.getAllJobs();
-        res.json(jobs);
-    } catch (error) {
-        res.status(500).json({ message: "Failed to fetch jobs.", error: error.message });
-    }
-};
+// REMOVED: const db = require('../services/databaseService');
 
-// This is an admin-like function to trigger the import
-exports.importJobs = async (req, res) => {
-    try {
-        // In a real app, you might upload the file. For simplicity, we assume the
-        // file is already on the server (e.g., in the project directory).
-        const excelFilePath = path.resolve(__dirname, '..', 'data', 'xpress_jobs_puppeteer.xlsx');
-        console.log(`Attempting to import from: ${excelFilePath}`);
+// The entire module is now a factory function that accepts the 'db' instance.
+module.exports = (db) => ({
 
-        const result = await db.importJobsFromExcel(excelFilePath);
-        res.status(200).json(result);
-    } catch (error) {
-        res.status(500).json({ message: "Failed to import jobs.", error: error.message });
+    getAllJobs: async (req, res) => {
+        try {
+            // Use the injected 'db' object for all database operations
+            const jobs = await db.getAllJobs();
+            res.json(jobs);
+        } catch (error) {
+            console.error("Error fetching all jobs:", error);
+            res.status(500).json({ message: "Failed to fetch jobs.", error: error.message });
+        }
+    },
+
+    // This is an admin-like function to trigger the import
+    importJobs: async (req, res) => {
+        try {
+            // This path resolves to the 'data' directory inside your project
+            const excelFilePath = path.resolve(__dirname, '..', 'data', 'xpress_jobs_puppeteer.xlsx');
+            console.log(`[Importer] Attempting to import from: ${excelFilePath}`);
+
+            // Use the injected 'db' object
+            const result = await db.importJobsFromExcel(excelFilePath);
+            
+            console.log(`[Importer] Import complete. Result:`, result);
+            res.status(200).json({ message: "Import process completed successfully.", details: result });
+
+        } catch (error) {
+            console.error(`[Importer] Failed to import jobs:`, error);
+            res.status(500).json({ message: "Failed to import jobs.", error: error.message });
+        }
     }
-};
+});

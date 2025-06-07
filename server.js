@@ -1,55 +1,56 @@
 // server.js
+
+// --- MODULE IMPORTS ---
 const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
-const path = require('path'); // For path.join
-const fs = require('fs');    // For fs.mkdirSync and fs.existsSync
+const path = require('path');
+const fs = require('fs');
+const db = require('./services/databaseService'); // Import the singleton instance
 
+// --- INITIAL SETUP ---
 // Load environment variables from .env file (primarily for local development)
 dotenv.config();
 
 const app = express();
 
-// Robust Port Selection Logic
+
+// --- PORT SELECTION LOGIC ---
 let portToListenOn;
 const portStringFromEnv = process.env.PORT; // This is provided by Railway (and other hosts)
 const localDefaultPort = 5000; // Your fallback for local development
 
 if (portStringFromEnv) {
   const parsedPort = parseInt(portStringFromEnv, 10);
-
   if (!isNaN(parsedPort) && parsedPort > 0 && parsedPort <= 65535) {
     portToListenOn = parsedPort;
     console.log(`[INFO] Using PORT from environment variable: ${portToListenOn}`);
   } else {
     console.error(
-      `[ERROR] Invalid PORT environment variable received: "${portStringFromEnv}". ` +
-      `It must be a string representing an integer between 1 and 65535. ` +
-      `Falling back to default port ${localDefaultPort}. ` +
-      `If on a hosting platform like Railway, check their PORT variable injection and remove any manual PORT overrides in your service settings.`
+      `[ERROR] Invalid PORT environment variable: "${portStringFromEnv}". Falling back to default port ${localDefaultPort}.`
     );
     portToListenOn = localDefaultPort;
   }
 } else {
   portToListenOn = localDefaultPort;
-  console.log(
-    `[INFO] PORT environment variable not set. Using default port ${portToListenOn} for local development.`
-  );
+  console.log(`[INFO] PORT environment variable not set. Using default port ${portToListenOn} for local development.`);
 }
 // End of Port Selection Logic
 
-// Middleware
+
+// --- MIDDLEWARE CONFIGURATION ---
 const corsOptions = {
-  origin: process.env.FRONTEND_URL || "*", // Be more specific in production
+  origin: process.env.FRONTEND_URL || "*", // It's better to be specific in production, e.g., 'https://your-app.vercel.app'
   optionsSuccessStatus: 200
 };
 app.use(cors(corsOptions));
 console.log(`[INFO] CORS configured for origin: ${corsOptions.origin}`);
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json()); // For parsing application/json
+app.use(express.urlencoded({ extended: true })); // For parsing application/x-www-form-urlencoded
 
-// SQLite Specific Directory Creation (harmless if not using SQLite)
+
+// --- FILE SYSTEM SETUP (for SQLite, harmless otherwise) ---
 const dbDir = path.join(__dirname, 'database');
 if (!fs.existsSync(dbDir)) {
   try {
@@ -61,42 +62,75 @@ if (!fs.existsSync(dbDir)) {
 } else {
   console.log(`[INFO] Directory already exists: ${dbDir}`);
 }
-// End of SQLite Specific Directory Creation
 
-// Mount routes
+
+// --- API ROUTES MOUNTING ---
 try {
   const authRoutes = require('./routes/authRoutes');
   const profileRoutes = require('./routes/profileRoutes');
-  const jobRoutes = require('./routes/jobRoutes');
+  const jobRoutes = require('./routes/jobRoutes'); // Make sure this file exists
 
   app.use('/api/auth', authRoutes);
   app.use('/api/profile', profileRoutes);
-  app.use('/api/jobs', jobRoutes);
-  console.log("[INFO] API routes mounted: /api/auth, /api/profile");
+  app.use('/api/jobs', jobRoutes); // Mount the new job routes
+  console.log("[INFO] API routes mounted: /api/auth, /api/profile, /api/jobs");
 } catch (routeError) {
-  console.error("[FATAL] Error loading routes. Application might not work correctly:", routeError);
-  // Consider exiting: process.exit(1);
+  console.error("[FATAL] Error loading routes. Application will not start correctly.", routeError);
+  process.exit(1); // Exit if routes can't be loaded, as the app is non-functional
 }
 
-// Health check endpoint
+
+// --- HEALTH CHECK ENDPOINT ---
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString(), message: 'Backend is healthy' });
+  const dbStatus = db.pool ? 'connected' : 'disconnected';
+  res.json({
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    database: dbStatus,
+    message: 'Backend is healthy'
+  });
 });
 
-// Initialize database service (if its constructor handles initialization)
-// const databaseService = require('./services/databaseService'); // Ensure this is instantiated
 
-const host = '0.0.0.0'; // Listen on all available interfaces
+// --- ASYNCHRONOUS SERVER STARTUP FUNCTION ---
+async function startServer() {
+  try {
+    // 1. Connect to and initialize the database. The server will wait for this to complete.
+    console.log('[STARTUP] Initializing database connection...');
+    await db.connect(); // This function now handles initialization
 
-app.listen(portToListenOn, host, () => {
-  console.log(`Server running on host ${host} and port ${portToListenOn}`);
-});
+    if (!db.pool) {
+        console.error("[FATAL] Database connection failed. Server will not start.");
+        process.exit(1); // Exit if the database connection fails
+    }
+    console.log('[STARTUP] Database initialization complete.');
 
+    // 2. Start the Express server only after the database is ready.
+    const host = '0.0.0.0'; // Listen on all available network interfaces
+    app.listen(portToListenOn, host, () => {
+      console.log(`[SUCCESS] Server is running on host ${host} and listening on port ${portToListenOn}`);
+    });
+
+  } catch (error) {
+    console.error('[FATAL] Failed to start server:', error);
+    process.exit(1); // Exit the process with an error code if startup fails
+  }
+}
+
+
+// --- GLOBAL ERROR HANDLERS ---
 process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  // Optional: Gracefully shutdown on unhandled rejections
+  // process.exit(1);
 });
 
 process.on('uncaughtException', (error) => {
   console.error('Uncaught Exception:', error);
-  // Consider graceful shutdown: process.exit(1);
+  // Mandatory: Gracefully shutdown on uncaught exceptions, as the application state is unreliable
+  process.exit(1);
 });
+
+
+// --- INITIATE SERVER STARTUP ---
+startServer();

@@ -39,37 +39,53 @@ class DatabaseService {
       return;
     }
     console.log("[DB Service] Initializing database schema...");
-    const schemasAndSetup = [
+    // Replace your existing schemasAndSetup constant with this complete version.
+
+const schemasAndSetup = [
+      // --- All Existing Table Schemas ---
       `CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, github_id TEXT UNIQUE NOT NULL, github_username TEXT NOT NULL, github_avatar_url TEXT, github_profile_url TEXT, created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP);`,
       `CREATE TABLE IF NOT EXISTS profile_generations (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE, generation_count INTEGER DEFAULT 0, last_generated_at TIMESTAMPTZ, created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP);`,
       `CREATE TABLE IF NOT EXISTS saved_profiles (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE, profile_data JSONB NOT NULL, created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP);`,
       `CREATE TABLE IF NOT EXISTS connections (id SERIAL PRIMARY KEY, requester_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, addressee_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, status VARCHAR(20) NOT NULL DEFAULT 'pending', created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP, CONSTRAINT uq_connection_pair UNIQUE (requester_id, addressee_id), CONSTRAINT chk_no_self_connect CHECK (requester_id <> addressee_id));`,
       `CREATE TABLE IF NOT EXISTS jobs (id SERIAL PRIMARY KEY, job_title TEXT NOT NULL, company_name TEXT, job_url TEXT UNIQUE NOT NULL, description_html TEXT, searchable_text tsvector, created_at TIMESTAMPTZ DEFAULT NOW());`,
+
+      // --- NEW: Schema for user_cvs table ---
+      // This table stores the parsed text of a user's CV.
+      // The user_id is UNIQUE to enforce a one-to-one relationship (one CV per user).
+      // ON DELETE CASCADE ensures that if a user is deleted, their CV is also deleted.
+      `CREATE TABLE IF NOT EXISTS user_cvs (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+          cv_text TEXT NOT NULL,
+          original_filename TEXT,
+          created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );`,
+
+      // --- Utility Function (Unchanged) ---
       `CREATE OR REPLACE FUNCTION update_updated_at_column() RETURNS TRIGGER AS $$ BEGIN NEW.updated_at = NOW(); RETURN NEW; END; $$ language 'plpgsql';`,
-      // --- NEW: User CVs Schema ---
-`CREATE TABLE IF NOT EXISTS user_cvs (
-    id SERIAL PRIMARY KEY,
-    user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
-    cv_text TEXT NOT NULL,
-    original_filename TEXT,
-    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-);`,
+
+      // --- Existing Triggers ---
       `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_users_updated_at') THEN CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); END IF; END $$;`,
       `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_profile_generations_updated_at') THEN CREATE TRIGGER update_profile_generations_updated_at BEFORE UPDATE ON profile_generations FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); END IF; END $$;`,
       `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_saved_profiles_updated_at') THEN CREATE TRIGGER update_saved_profiles_updated_at BEFORE UPDATE ON saved_profiles FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); END IF; END $$;`,
       `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_connections_updated_at') THEN CREATE TRIGGER update_connections_updated_at BEFORE UPDATE ON connections FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); END IF; END $$;`,
+
+      // --- NEW: Trigger for user_cvs table ---
+      // This ensures the `updated_at` timestamp is automatically updated when a user uploads a new CV.
+      `DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_user_cvs_updated_at' AND tgrelid = 'user_cvs'::regclass) THEN
+          CREATE TRIGGER update_user_cvs_updated_at BEFORE UPDATE ON user_cvs FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+        END IF;
+      END $$;`,
+
+      // --- Existing Indexes ---
       `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_class c WHERE c.relname = 'idx_connections_requester_id') THEN CREATE INDEX idx_connections_requester_id ON connections(requester_id); END IF; END $$;`,
       `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_class c WHERE c.relname = 'idx_connections_addressee_id') THEN CREATE INDEX idx_connections_addressee_id ON connections(addressee_id); END IF; END $$;`,
       `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_class c WHERE c.relname = 'idx_connections_status') THEN CREATE INDEX idx_connections_status ON connections(status); END IF; END $$;`,
       `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_class c WHERE c.relname = 'jobs_search_idx') THEN CREATE INDEX jobs_search_idx ON jobs USING GIN (searchable_text); END IF; END $$;`
-    // --- NEW: Trigger for user_cvs ---
-`DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_user_cvs_updated_at') THEN
-    CREATE TRIGGER update_user_cvs_updated_at BEFORE UPDATE ON user_cvs FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-  END IF;
-END $$;`
     ];
+
     try {
       for (const statement of schemasAndSetup) await this.pool.query(statement);
       console.log('[DB Service] All database schemas initialized/verified successfully.');

@@ -149,7 +149,9 @@ class DatabaseService {
 
   // --- Job Data Methods ---
   async getAllJobs() {
-    const result = await this.query(`SELECT id, job_title, company_name, job_url FROM jobs ORDER BY created_at DESC;`);
+    const result = await this.query(`SELECT id, job_title, company_name, job_url, description_html
+      FROM jobs
+      ORDER BY created_at DESC;`);
     return result.rows;
   }
   async importJobsFromExcel(filePath) {

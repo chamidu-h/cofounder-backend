@@ -1,11 +1,5 @@
-// routes/profileRoutes.js
 const express = require('express');
 const router = express.Router();
-
-// REMOVED: const profileController = require('../controllers/profileController');
-// REMOVED: const suggestionController = require('../controllers/suggestionController');
-// REMOVED: const connectionController = require('../controllers/connectionController');
-// REMOVED: const { authenticateToken } = require('../middleware/authMiddleware');
 
 // The entire module is now a factory function that accepts all its dependencies.
 module.exports = (profileController, suggestionController, connectionController, authMiddleware) => {
@@ -28,6 +22,11 @@ module.exports = (profileController, suggestionController, connectionController,
     router.post('/connections/accept', authMiddleware.authenticateToken, connectionController.acceptRequest);
     router.delete('/connections/:connectionId/decline', authMiddleware.authenticateToken, connectionController.declineOrCancelRequest);
     router.get('/connections/active', authMiddleware.authenticateToken, connectionController.getActiveConnections);
+
+    // --- ADDED ROUTE ---
+    // Handles the frontend's request to check the connection status with another user.
+    // This resolves the 404 error that was crashing the profile page.
+    router.get('/connections/status/:viewedUserId', authMiddleware.authenticateToken, connectionController.getStatus);
 
     // --- Public Profile Route ---
     // NOTE: This route must be last, as the ':userId' is a wildcard that would otherwise

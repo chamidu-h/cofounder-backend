@@ -1,7 +1,3 @@
-// controllers/connectionController.js
-
-// REMOVED: const databaseService = require('../services/databaseService');
-
 // The entire module is now a factory function that accepts the 'db' instance.
 module.exports = (db) => ({
 
@@ -118,6 +114,39 @@ module.exports = (db) => ({
         } catch (error) {
             console.error("Error fetching active connections:", error);
             res.status(500).json({ error: "Failed to fetch active connections" });
+        }
+    },
+    
+    // --- ADDED METHOD ---
+    // Provides the logic for checking the connection status between two users.
+    getStatus: async (req, res) => {
+        const currentUserId = req.user.userId;
+        const viewedUserId = parseInt(req.params.viewedUserId, 10);
+
+        if (isNaN(viewedUserId)) {
+            return res.status(400).json({ error: "A valid numeric user ID must be provided in the URL." });
+        }
+        
+        // Prevent checking status with oneself, which should not happen but is good practice.
+        if (currentUserId === viewedUserId) {
+             return res.json({ status: 'self' }); // Or null, depending on desired frontend logic.
+        }
+
+        try {
+            // This reuses the same database function that sendRequest uses to check for existing connections.
+            const connection = await db.getConnectionStatus(currentUserId, viewedUserId);
+
+            if (!connection) {
+                // No connection record exists, so the status is null.
+                return res.json({ status: null });
+            }
+
+            // A connection was found, return its status (e.g., 'pending', 'accepted').
+            return res.json({ status: connection.status });
+
+        } catch (error) {
+            console.error("Error in getStatus controller:", error);
+            res.status(500).json({ error: "Server error while fetching connection status." });
         }
     }
 });

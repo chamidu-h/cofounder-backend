@@ -1,5 +1,3 @@
-// controllers/profileController.js
-
 const profileService = require('../services/profileService');
 
 // The entire module is now a factory function that accepts the 'db' instance.

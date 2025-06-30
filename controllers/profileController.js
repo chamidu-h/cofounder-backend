@@ -1,9 +1,6 @@
 // controllers/profileController.js
 
-// Keep your dependency on profileService, as it doesn't cause a circular issue.
 const profileService = require('../services/profileService');
-
-// REMOVED: const databaseService = require('../services/databaseService');
 
 // The entire module is now a factory function that accepts the 'db' instance.
 module.exports = (db) => ({
@@ -11,11 +8,8 @@ module.exports = (db) => ({
     generateProfile: async (req, res) => {
         try {
             const { userId, accessToken } = req.user;
-
-            // Get current generation count and saved profile status from the injected db object
             const generationCount = await db.getGenerationCount(userId);
             const savedProfile = await db.getUserProfile(userId);
-
             const effectiveLimit = savedProfile ? 3 : 2;
 
             if (generationCount >= effectiveLimit) {
@@ -26,8 +20,6 @@ module.exports = (db) => ({
             }
 
             const structuredProfile = await profileService.generateStructuredProfile(accessToken);
-
-            // Use the injected db object to increment the count
             await db.incrementGenerationCount(userId);
             const newCount = generationCount + 1;
 
@@ -35,7 +27,6 @@ module.exports = (db) => ({
             const shouldAutoSave = newCount === 3 || (!savedProfile && newCount === effectiveLimit);
 
             if (shouldAutoSave) {
-                // Use the injected db object to save the profile
                 await db.saveUserProfile(userId, structuredProfile);
                 autoSaved = true;
             }
@@ -63,13 +54,8 @@ module.exports = (db) => ({
                 return res.status(400).json({ error: 'Profile data is required' });
             }
 
-            // Use the injected db object to save the profile
             await db.saveUserProfile(userId, profileData);
-
-            res.json({
-                success: true,
-                message: 'Profile saved successfully'
-            });
+            res.json({ success: true, message: 'Profile saved successfully' });
 
         } catch (err) {
             console.error('Save profile error:', err);
@@ -80,7 +66,6 @@ module.exports = (db) => ({
     getSavedProfile: async (req, res) => {
         try {
             const { userId } = req.user;
-            // Use the injected db object to get the profile
             const savedProfile = await db.getUserProfile(userId);
 
             if (!savedProfile) {
@@ -98,8 +83,6 @@ module.exports = (db) => ({
     deleteProfile: async (req, res) => {
         try {
             const { userId } = req.user;
-
-            // Use the injected db object for all database operations
             const savedProfile = await db.getUserProfile(userId);
             if (!savedProfile) {
                 return res.status(404).json({ error: 'No saved profile found to delete' });
@@ -126,7 +109,6 @@ module.exports = (db) => ({
                 return res.status(400).json({ error: 'Invalid user ID format.' });
             }
 
-            // Use the injected db object for all database operations
             const userBasicInfo = await db.getUserById(userIdToView);
             if (!userBasicInfo) {
                 return res.status(404).json({ error: 'User not found.' });
@@ -134,19 +116,26 @@ module.exports = (db) => ({
 
             const userProfileRow = await db.getUserProfile(userIdToView);
 
+            // This now correctly returns the user object with a null profile
+            // instead of a 404 error, allowing the frontend to handle it gracefully.
             if (!userProfileRow || !userProfileRow.profile_data) {
-                return res.status(404).json({
-                    error: 'This user has not created a co-founder profile yet.',
+                return res.json({
                     user: {
+                        id: userBasicInfo.id, // Use 'id' for consistency
                         github_username: userBasicInfo.github_username,
-                        github_avatar_url: userBasicInfo.github_avatar_url
-                    }
+                        github_avatar_url: userBasicInfo.github_avatar_url,
+                        github_profile_url: userBasicInfo.github_profile_url
+                    },
+                    profile: null 
                 });
             }
 
+            // --- FIXED RESPONSE ---
+            // The user ID property is now 'id' to match the /auth/user endpoint.
+            // This eliminates the data inconsistency that caused the frontend bug.
             res.json({
                 user: {
-                    user_id: userBasicInfo.id,
+                    id: userBasicInfo.id,
                     github_username: userBasicInfo.github_username,
                     github_avatar_url: userBasicInfo.github_avatar_url,
                     github_profile_url: userBasicInfo.github_profile_url

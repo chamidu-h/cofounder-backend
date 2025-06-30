@@ -116,30 +116,26 @@ module.exports = (db) => ({
 
             const userProfileRow = await db.getUserProfile(userIdToView);
 
-            // This now correctly returns the user object with a null profile
-            // instead of a 404 error, allowing the frontend to handle it gracefully.
+            // FIXED: Consistent response structure using 'id' property
+            // This eliminates the data inconsistency that caused the frontend bug
+            const userResponse = {
+                id: userBasicInfo.id, // Consistent 'id' property
+                github_username: userBasicInfo.github_username,
+                github_avatar_url: userBasicInfo.github_avatar_url,
+                github_profile_url: userBasicInfo.github_profile_url
+            };
+
+            // Handle case where user exists but has no profile
             if (!userProfileRow || !userProfileRow.profile_data) {
                 return res.json({
-                    user: {
-                        id: userBasicInfo.id, // Use 'id' for consistency
-                        github_username: userBasicInfo.github_username,
-                        github_avatar_url: userBasicInfo.github_avatar_url,
-                        github_profile_url: userBasicInfo.github_profile_url
-                    },
+                    user: userResponse,
                     profile: null 
                 });
             }
 
-            // --- FIXED RESPONSE ---
-            // The user ID property is now 'id' to match the /auth/user endpoint.
-            // This eliminates the data inconsistency that caused the frontend bug.
+            // Return user with profile data
             res.json({
-                user: {
-                    id: userBasicInfo.id,
-                    github_username: userBasicInfo.github_username,
-                    github_avatar_url: userBasicInfo.github_avatar_url,
-                    github_profile_url: userBasicInfo.github_profile_url
-                },
+                user: userResponse,
                 profile: userProfileRow.profile_data
             });
 

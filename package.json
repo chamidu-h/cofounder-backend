@@ -16,7 +16,7 @@
     "groq-sdk": "^0.3.1",
     "jsonwebtoken": "^9.0.2",
     "mammoth": "^1.9.1",
-    "multer": "^2.0.1",
+    "multer": "^2.0.2",
     "pdf-parse": "^1.1.1",
     "pg": "^8.16.0"
   },

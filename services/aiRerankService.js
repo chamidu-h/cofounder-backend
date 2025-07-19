@@ -40,7 +40,7 @@ async function getAiRank(cvText, jobDescription) {
     try {
         const completion = await groq.chat.completions.create({
             // You can test with 'llama3-8b-8192' if qwen continues to be problematic.
-            model: 'qwen-qwq-32b',
+            model: 'qwen/qwen3-32b',
             
             // --- THE CORE FIX ---
             // Use the correct 'system_prompt' and 'user_prompt' variables here.

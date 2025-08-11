@@ -1,6 +1,6 @@
 // controllers/suggestionController.js
 
-// Helper function to calculate Jaccard Index for array similarity
+// Helper function to calculate Jaccard for array similarity
 function calculateJaccardIndex(arr1, arr2) {
     if (!arr1 || !arr2 || arr1.length === 0 || arr2.length === 0) return 0;
     const set1 = new Set(arr1.map(item => String(item).toLowerCase().trim()));

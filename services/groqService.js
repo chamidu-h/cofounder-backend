@@ -111,7 +111,7 @@ Return ONLY the JSON object; do not return thinking or any other additional text
 
   try {
     const completion = await groq.chat.completions.create({
-      model: "qwen-qwq-32b",
+      model: "qwen/qwen3-32b",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user",   content: userPrompt   }
